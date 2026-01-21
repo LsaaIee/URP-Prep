@@ -122,7 +122,7 @@ def process_image(image_path):
 # 4. Run
 # ===============================
 if __name__ == "__main__":
-    image_path = "ref.jpg"   
+    image_path = "C:/Users/leeji/Desktop/URP 준비/ref.jpg"   
     print("before process_image\n")
     output, counts = process_image(image_path)
 
@@ -133,4 +133,5 @@ if __name__ == "__main__":
     plt.figure(figsize=(10, 10))
     plt.imshow(cv2.cvtColor(output, cv2.COLOR_BGR2RGB))
     plt.axis("off")
-    plt.show()
+    plt.savefig("result.png", dpi=200)
+    print("Saved the result")
