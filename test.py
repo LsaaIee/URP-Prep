@@ -122,7 +122,7 @@ def process_image(image_path):
 # 4. Run
 # ===============================
 if __name__ == "__main__":
-    image_path = "C:/Users/leeji/Desktop/URP 준비/ref.jpg"   
+    image_path = "ref.jpg"   
     print("before process_image\n")
     output, counts = process_image(image_path)
 
