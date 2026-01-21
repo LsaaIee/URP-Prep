@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 
 from skimage import filters, morphology, measure
 from skimage.feature import peak_local_max
+from skimage.segmentation import watershed
 from scipy import ndimage as ndi
 
 
@@ -14,24 +15,37 @@ def detect_petri_dishes(image):
     """
     Detect circular petri dishes using Hough Circle Transform
     """
+    scale = 0.4
+    small = cv2.resize(
+        image, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA
+    )
+
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     gray = cv2.GaussianBlur(gray, (9, 9), 1.5)
-
+    
     circles = cv2.HoughCircles(
         gray,
         cv2.HOUGH_GRADIENT,
         dp=1.2,
-        minDist=200,
+        minDist=200 * scale,
         param1=100,
-        param2=30,
-        minRadius=150,
-        maxRadius=500
+        param2=60,
+        minRadius=int(1000*scale),
+        maxRadius=int(1500*scale)
     )
 
     if circles is None:
         return []
 
-    circles = np.uint16(np.around(circles[0]))
+    circles = np.round(circles[0]).astype(int)
+    results = []
+    for x, y, r in circles:
+        results.append((
+            int(x / scale),
+            int(y / scale),
+            int(r / scale)
+        ))
+
     return circles
 
 
@@ -52,7 +66,7 @@ def count_colonies(plate_img):
     binary = gray < thresh   # colonies usually darker
 
     # remove noise
-    binary = morphology.remove_small_objects(binary, min_size=50)
+    binary = morphology.remove_small_objects(binary, max_size=50)
     binary = morphology.opening(binary, morphology.disk(2))
 
     # distance transform
@@ -71,7 +85,7 @@ def count_colonies(plate_img):
     markers, _ = ndi.label(mask)
 
     # watershed segmentation
-    labels = morphology.watershed(-distance, markers, mask=binary)
+    labels = watershed(-distance, markers, mask=binary)
 
     colony_count = len(np.unique(labels)) - 1
     return colony_count, labels
