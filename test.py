@@ -2,90 +2,100 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-# =============================
+# -----------------------------
 # 1. 이미지 로드
-# =============================
-img = cv2.imread("single_petri.jpg")
-if img is None:
-    raise RuntimeError("이미지를 불러올 수 없습니다.")
-
+# -----------------------------
+img = cv2.imread("ref.jpg")
+orig = img.copy()
 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-h, w = gray.shape
 
-# =============================
-# 2. 페트리 접시 마스크 생성
-# (이미지 중앙의 가장 큰 원)
-# =============================
-mask = np.zeros_like(gray, dtype=np.uint8)
+# -----------------------------
+# 2. 페트리 접시 검출 (Hough Circle)
+# -----------------------------
+gray_blur = cv2.GaussianBlur(gray, (9, 9), 1.5)
 
-center_x, center_y = w // 2, h // 2
-radius = min(center_x, center_y) - 20   # 테두리 제거 여유
+circles = cv2.HoughCircles(
+    gray_blur,
+    cv2.HOUGH_GRADIENT,
+    dp=1.2,
+    minDist=500,
+    param1=100,
+    param2=30,
+    minRadius=300,
+    maxRadius=600
+)
 
-cv2.circle(mask, (center_x, center_y), radius, 255, -1)
+dish_mask = np.zeros_like(gray)
 
-plate = cv2.bitwise_and(gray, gray, mask=mask)
+if circles is not None:
+    circles = np.uint16(np.around(circles))
+    x, y, r = circles[0][0]
+    cv2.circle(dish_mask, (x, y), r, 255, -1)  # 접시 내부만 흰색
 
-# =============================
-# 3. Colony 강조
-# =============================
-blur = cv2.GaussianBlur(plate, (5, 5), 0)
-
-thresh = cv2.adaptiveThreshold(
-    blur,
+# -----------------------------
+# 3. 접시 내부에서 colony 분리
+# -----------------------------
+# colony는 배경보다 밝기 차이가 있음
+# adaptive threshold가 훨씬 안정적
+th = cv2.adaptiveThreshold(
+    gray,
     255,
     cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-    cv2.THRESH_BINARY_INV,
-    31,
-    4
+    cv2.THRESH_BINARY,
+    51,
+    -5
 )
 
-# =============================
-# 4. 노이즈 제거
-# =============================
-kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+# 접시 영역만 사용
+colony_mask = cv2.bitwise_and(th, th, mask=dish_mask)
 
-# =============================
-# 5. Colony contour 검출
-# =============================
-contours, _ = cv2.findContours(
-    thresh,
-    cv2.RETR_EXTERNAL,
-    cv2.CHAIN_APPROX_SIMPLE
+# -----------------------------
+# 4. Morphology (colony 정제)
+# -----------------------------
+kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+
+# 노이즈 제거
+colony_mask = cv2.morphologyEx(colony_mask, cv2.MORPH_OPEN, kernel)
+
+# colony 내부 채우기 (여기서 fill!)
+colony_mask = cv2.morphologyEx(colony_mask, cv2.MORPH_CLOSE, kernel)
+
+# -----------------------------
+# 5. Connected Components
+# -----------------------------
+num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+    colony_mask, connectivity=8
 )
 
-colony_count = 0
-output = img.copy()
+count = 0
+output = orig.copy()
 
-for c in contours:
-    area = cv2.contourArea(c)
+for i in range(1, num_labels):  # 0은 background
+    area = stats[i, cv2.CC_STAT_AREA]
 
-    # ⚠️ colony 크기 필터 (중요)
-    if 30 < area < 3000:
-        colony_count += 1
-        cv2.drawContours(output, [c], -1, (0, 0, 255), 1)
+    if 30 < area < 3000:  # colony 크기 필터 (중요)
+        count += 1
+        cx, cy = centroids[i]
+        cv2.circle(output, (int(cx), int(cy)), 5, (0, 0, 255), -1)
 
-# =============================
-# 6. 결과 출력
-# =============================
-print(f"Colony 개수: {colony_count}")
+# -----------------------------
+# 6. 결과 시각화
+# -----------------------------
+plt.figure(figsize=(15,5))
 
-plt.figure(figsize=(12, 4))
-
-plt.subplot(1, 3, 1)
+plt.subplot(1,3,1)
 plt.title("Original")
-plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+plt.imshow(cv2.cvtColor(orig, cv2.COLOR_BGR2RGB))
 plt.axis("off")
 
-plt.subplot(1, 3, 2)
-plt.title("Threshold")
-plt.imshow(thresh, cmap="gray")
+plt.subplot(1,3,2)
+plt.title("Colony Mask")
+plt.imshow(colony_mask, cmap="gray")
 plt.axis("off")
 
-plt.subplot(1, 3, 3)
-plt.title(f"Detected Colonies: {colony_count}")
+plt.subplot(1,3,3)
+plt.title(f"Detected Colonies: {count}")
 plt.imshow(cv2.cvtColor(output, cv2.COLOR_BGR2RGB))
 plt.axis("off")
 
-plt.tight_layout()
 plt.show()
