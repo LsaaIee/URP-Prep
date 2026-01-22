@@ -2,150 +2,90 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-from skimage import filters, morphology, measure
-from skimage.feature import peak_local_max
-from skimage.segmentation import watershed
-from scipy import ndimage as ndi
+# =============================
+# 1. 이미지 로드
+# =============================
+img = cv2.imread("single_petri.jpg")
+if img is None:
+    raise RuntimeError("이미지를 불러올 수 없습니다.")
 
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+h, w = gray.shape
 
-# ===============================
-# 1. Petri dish (circle) detection
-# ===============================
-def detect_petri_dishes(image):
-    """
-    Detect circular petri dishes using Hough Circle Transform
-    """
-    scale = 0.4
-    small = cv2.resize(
-        image, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA
-    )
+# =============================
+# 2. 페트리 접시 마스크 생성
+# (이미지 중앙의 가장 큰 원)
+# =============================
+mask = np.zeros_like(gray, dtype=np.uint8)
 
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    gray = cv2.GaussianBlur(gray, (9, 9), 1.5)
-    
-    circles = cv2.HoughCircles(
-        gray,
-        cv2.HOUGH_GRADIENT,
-        dp=1.2,
-        minDist=200 * scale,
-        param1=100,
-        param2=60,
-        minRadius=int(1000*scale),
-        maxRadius=int(1500*scale)
-    )
+center_x, center_y = w // 2, h // 2
+radius = min(center_x, center_y) - 20   # 테두리 제거 여유
 
-    if circles is None:
-        return []
+cv2.circle(mask, (center_x, center_y), radius, 255, -1)
 
-    circles = np.round(circles[0]).astype(int)
-    results = []
-    for x, y, r in circles:
-        results.append((
-            int(x / scale),
-            int(y / scale),
-            int(r / scale)
-        ))
+plate = cv2.bitwise_and(gray, gray, mask=mask)
 
-    return circles
+# =============================
+# 3. Colony 강조
+# =============================
+blur = cv2.GaussianBlur(plate, (5, 5), 0)
 
+thresh = cv2.adaptiveThreshold(
+    blur,
+    255,
+    cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+    cv2.THRESH_BINARY_INV,
+    31,
+    4
+)
 
-# ===============================
-# 2. Colony counting in one plate
-# ===============================
-def count_colonies(plate_img):
-    """
-    Count bacterial colonies inside a single petri dish
-    """
-    gray = cv2.cvtColor(plate_img, cv2.COLOR_BGR2GRAY)
+# =============================
+# 4. 노이즈 제거
+# =============================
+kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
 
-    # contrast enhancement
-    gray = cv2.equalizeHist(gray)
+# =============================
+# 5. Colony contour 검출
+# =============================
+contours, _ = cv2.findContours(
+    thresh,
+    cv2.RETR_EXTERNAL,
+    cv2.CHAIN_APPROX_SIMPLE
+)
 
-    # adaptive threshold (Otsu)
-    thresh = filters.threshold_otsu(gray)
-    binary = gray < thresh   # colonies usually darker
+colony_count = 0
+output = img.copy()
 
-    # remove noise
-    binary = morphology.remove_small_objects(binary, max_size=50)
-    binary = morphology.opening(binary, morphology.disk(2))
+for c in contours:
+    area = cv2.contourArea(c)
 
-    # distance transform
-    distance = ndi.distance_transform_edt(binary)
+    # ⚠️ colony 크기 필터 (중요)
+    if 30 < area < 3000:
+        colony_count += 1
+        cv2.drawContours(output, [c], -1, (0, 0, 255), 1)
 
-    # local maxima
-    coords = peak_local_max(
-        distance,
-        min_distance=10,
-        labels=binary
-    )
+# =============================
+# 6. 결과 출력
+# =============================
+print(f"Colony 개수: {colony_count}")
 
-    mask = np.zeros(distance.shape, dtype=bool)
-    mask[tuple(coords.T)] = True
+plt.figure(figsize=(12, 4))
 
-    markers, _ = ndi.label(mask)
+plt.subplot(1, 3, 1)
+plt.title("Original")
+plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+plt.axis("off")
 
-    # watershed segmentation
-    labels = watershed(-distance, markers, mask=binary)
+plt.subplot(1, 3, 2)
+plt.title("Threshold")
+plt.imshow(thresh, cmap="gray")
+plt.axis("off")
 
-    colony_count = len(np.unique(labels)) - 1
-    return colony_count, labels
+plt.subplot(1, 3, 3)
+plt.title(f"Detected Colonies: {colony_count}")
+plt.imshow(cv2.cvtColor(output, cv2.COLOR_BGR2RGB))
+plt.axis("off")
 
-
-# ===============================
-# 3. Main pipeline
-# ===============================
-def process_image(image_path):
-    image = cv2.imread(image_path)
-    if image is None:
-        raise ValueError("Image not found")
-
-    output = image.copy()
-    print("before detect_petri_dishes\n")
-    plates = detect_petri_dishes(image)
-    print("after detect_petri_dishes\n")
-
-    results = []
-
-    for i, (x, y, r) in enumerate(plates):
-        # crop plate
-        y1, y2 = max(0, y - r), min(image.shape[0], y + r)
-        x1, x2 = max(0, x - r), min(image.shape[1], x + r)
-        plate_img = image[y1:y2, x1:x2]
-
-        print("before count_colonies\n")
-        count, labels = count_colonies(plate_img)
-        print("after count_colonies\n")
-        results.append(count)
-
-        # draw result
-        cv2.circle(output, (x, y), r, (0, 255, 0), 3)
-        cv2.putText(
-            output,
-            f"Plate {i+1}: {count}",
-            (x - r, y - r - 10),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.8,
-            (0, 255, 0),
-            2
-        )
-
-    return output, results
-
-
-# ===============================
-# 4. Run
-# ===============================
-if __name__ == "__main__":
-    image_path = "ref.jpg"   
-    print("before process_image\n")
-    output, counts = process_image(image_path)
-
-    print("Colony counts per plate:")
-    for i, c in enumerate(counts):
-        print(f"Plate {i+1}: {c}")
-
-    plt.figure(figsize=(10, 10))
-    plt.imshow(cv2.cvtColor(output, cv2.COLOR_BGR2RGB))
-    plt.axis("off")
-    plt.savefig("result.png", dpi=200)
-    print("Saved the result")
+plt.tight_layout()
+plt.show()
