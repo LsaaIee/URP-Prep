@@ -87,12 +87,19 @@ if st.button("🚀 예측 시작", type="primary", use_container_width=True):
     else:
         with st.spinner("분석 중... (최대 2-3분 소요)"):
             try:
+                weights = {
+                    "structure": w_structure,
+                    "penetration": w_penetration,
+                    "sequence": w_sequence,
+                }
+
                 result = calculate_final_score(
                     sequence=full_sequence,
                     fusion_peptide=fusion_peptide,
                     fusion_type=fusion_type_name,
                     manual_plddt=manual_plddt,
-                    use_alphafold=use_alphafold
+                    use_alphafold=use_alphafold,
+                    weights=weights,
                 )
                 
                 # 결과 표시

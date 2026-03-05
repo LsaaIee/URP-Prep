@@ -281,8 +281,14 @@ def calculate_sequence_score(sequence):
 
 # ================== 4. 종합 스코어 계산 ==================
 
-def calculate_final_score(sequence, fusion_peptide, fusion_type, 
-                          manual_plddt=None, use_alphafold=False):
+def calculate_final_score(
+        sequence, 
+        fusion_peptide, 
+        fusion_type, 
+        manual_plddt=None, 
+        use_alphafold: bool = False, 
+        weights=None,
+    ) -> dict:
     """
     최종 0-1 스코어 계산 및 의사결정
     
@@ -346,10 +352,30 @@ def calculate_final_score(sequence, fusion_peptide, fusion_type,
     print("📊 최종 스코어 계산")
     
     # 가중치
-    w_structure = 0.30
-    w_penetration = 0.40
-    w_sequence = 0.30
+    # w_structure = 0.30
+    # w_penetration = 0.40
+    # w_sequence = 0.30
     
+    if weights is None: 
+        w_structure = 0.30
+        w_penetration = 0.40
+        w_sequence = 0.30
+    else:
+        w_structure = weights.get("structure", 0.30)
+        w_penetration = weights.get("penetration", 0.40)
+        w_sequence = weights.get("sequence", 0.30)
+
+    total_w = w_structure + w_penetration + w_sequence
+    if total_w == 0:
+        w_structure = 0.30
+        w_penetration = 0.40
+        w_sequence = 0.30
+        total_w = 1.0
+    
+    w_structure /= total_w
+    w_penetration /= total_w
+    w_sequence /= total_w
+
     final_score = (
         w_structure * structure_score +
         w_penetration * penetration_score +
@@ -447,13 +473,13 @@ if __name__ == "__main__":
     print("\n[예시 1] T5-SMAP29 서열 분석\n")
     
     # 실제 서열로 교체하세요
-    example_sequence = "MFKLSQRSKDRLVGVHPDLVKVVHRALELTPVDFGITEGVRSLETQKKYVAEGKSKTMKSRHLHGLAVDVVAYPKDKDTWNMKYYRMIADAFKQAGRELGVSVEWGGDWVSFKDGVHFQLPHSKYPDPKLE"
-    fusion_peptide = "RKLRRLKRKIAHKVKKY"  # SMAP-29
+    example_sequence = "SFKFGKNSEKQLATVKPELQKVARRALELSPYDFTIVQGIRTVAQSAQNIANGTSFLKDPSKSKHITGDAIDFAPYINGKIDWNDLEAFWAVKKAFEQAGKELGIKLRFGADWNASSGIIMMKLNVAPMMVVVELV"
+    fusion_peptide = "KWKLFKKI"  # SMAP-29
     
     result = calculate_final_score(
         sequence=example_sequence + fusion_peptide,
         fusion_peptide=fusion_peptide,
-        fusion_type="SMAP-29",
+        fusion_type="KWK",
         manual_plddt=82.5,  # AlphaFold로 얻은 값 또는 추정값
         use_alphafold=False  # True로 설정하면 AlphaFold 자동 실행
     )
