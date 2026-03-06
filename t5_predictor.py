@@ -169,7 +169,7 @@ def calculate_amphipathicity(sequence):
     return max_hydrophobic_moment
 
 
-def calculate_penetration_score(fusion_peptide, fusion_type):
+def calculate_penetration_score(fusion_peptide, fusion_type): 
     """
     외막 투과 능력 예측 스코어
     """
@@ -179,7 +179,7 @@ def calculate_penetration_score(fusion_peptide, fusion_type):
         return 0.5  # 기본값
     
     # 1. 양전하 점수 (0-1)
-    # +3 이상이면 만점
+    # +3 이상이면 만점 
     charge_score = min(1.0, max(0, props['charge']) / 4.0)
     
     # 2. 양친매성 점수 (0-1)
@@ -223,7 +223,7 @@ def calculate_penetration_score_for_list(fusion_peptides):
     fusion_peptides: [{"name": ..., "seq": ..., "position": ...}, ...]
     """
     if not fusion_peptides:
-        # fusion이 아예 없을 때: 외막 투과는 거의 안 된다고 가정 (튜닝 가능)
+        # fusion이 아예 없을 때: 외막 투과는 거의 안 된다고 가정 (튜닝 가능) &
         return 0.10
 
     scores = []
@@ -254,9 +254,9 @@ def load_esm_model():
         print("ESM-2 모델 로딩 중... (첫 실행 시 2-3분 소요)")
         
         # 작은 모델 사용 (8M 파라미터) - 빠른 실행
-        model_name = "facebook/esm2_t6_8M_UR50D"
+        #model_name = "facebook/esm2_t6_8M_UR50D"
         # 더 정확한 모델 (650M 파라미터) - 느리지만 정확
-        # model_name = "facebook/esm2_t33_650M_UR50D"
+        model_name = "facebook/esm2_t33_650M_UR50D"
         
         ESM_TOKENIZER = AutoTokenizer.from_pretrained(model_name)
         ESM_MODEL = EsmForMaskedLM.from_pretrained(model_name)
@@ -305,7 +305,6 @@ def calculate_sequence_score(sequence):
 def calculate_final_score(
         sequence, 
         fusion_peptides=None, # 0 <= 개의 fusion peptide를 위한 수정
-        #fusion_type, 
         manual_plddt=None, 
         use_alphafold: bool = False, 
         weights=None,
@@ -362,21 +361,6 @@ def calculate_final_score(
     print(f"   Fusion 개수: {len(fusion_peptides)}")
     print(f"   투과 스코어: {penetration_score:.3f}\n")
 
-    # if fusion_peptides:
-    #     fp0 = fusion_peptides[0]
-    #     props0 = calculate_peptide_properties(fp0["seq"])
-    #     if props0:
-    #         print(f"   [Fusion #1: {fp0['name']} @ {fp0['position']}]")
-    #         print(f"     순전하: {props0['charge']:+.2f}")
-    #         print(f"     소수성 (GRAVY): {props0['gravy']:.3f}")
-            
-    # props = calculate_peptide_properties(fusion_peptide)
-    # if props:
-    #     print(f"   순전하: {props['charge']:+.2f}")
-    #     print(f"   소수성 (GRAVY): {props['gravy']:.3f}")
-    #     print(f"   양전하 비율: {props['positive_ratio']:.1%}")
-    # print(f"   투과 스코어: {penetration_score:.3f}\n")
-    
     # 3. 서열 적합성 스코어
     print("🤖 3단계: AI 서열 적합성 분석")
     sequence_score, mlm_loss = calculate_sequence_score(sequence)
@@ -388,11 +372,7 @@ def calculate_final_score(
     # 4. 최종 스코어 계산
     print("📊 최종 스코어 계산")
     
-    # 가중치
-    # w_structure = 0.30
-    # w_penetration = 0.40
-    # w_sequence = 0.30
-    
+    # 가중치    
     if weights is None: 
         w_structure = 0.30
         w_penetration = 0.40
