@@ -399,14 +399,14 @@ def calculate_final_score(
         w_sequence = 0.30
     else:
         w_structure = weights.get("structure", 0.30)
-        w_penetration = weights.get("penetration", 0.40)
-        w_sequence = weights.get("sequence", 0.30)
+        w_penetration = weights.get("penetration", 0.55)
+        w_sequence = weights.get("sequence", 0.15)
 
     total_w = w_structure + w_penetration + w_sequence
     if total_w == 0:
         w_structure = 0.30
-        w_penetration = 0.40
-        w_sequence = 0.30
+        w_penetration = 0.55
+        w_sequence = 0.15
         total_w = 1.0
     
     w_structure /= total_w
@@ -520,29 +520,16 @@ if __name__ == "__main__":
 
     # 사용 예시 2: T5 + KWK
     print("\n[예시 2] T5 + KWK\n")
-    fusion_peptides = [
+    fusion_kwk = [
         {"name": "KWK", "seq": "KWKLFKKI", "position": "internal"}
     ]
-    ## from here, add kwk, cys, kwk+cys
-
+    
+    kwk_sequence = "SFKFGKNSEKQLATVKPELQKVARRALELSPYDFTIVQGIRTVAQSAQKWKLFKKIPSKSKHITGDAIDFAPYINGKIDWNDLEAFWAVKKAFEQAGKELGIKLRFGADWNASSGIIMMKLNVAPMMVVVELV"
     result_kwk = calculate_final_score(
-        sequence=kwk_sequence
-        fusion_peptides=fusion_peptides,
+        sequence=kwk_sequence,
+        fusion_peptides=fusion_kwk,
         manual_plddt=74.2,  # AlphaFold로 얻은 값 또는 추정값
         use_alphafold=False  # True로 설정하면 AlphaFold 자동 실행
     )
-    
-    print("\n[예시 3] T5 + cys\n")
-    fusion_peptides = [
-        {"name": "cys", "seq": "GGGGSC", "position": "C-terminal"}
-    ]
-    result = calculate_final_score(
-        sequence=example_sequence + "GGGGSC",
-        fusion_peptides=fusion_peptides,
-        manual_plddt=70.4,  # AlphaFold로 얻은 값 또는 추정값
-        use_alphafold=False  # True로 설정하면 AlphaFold 자동 실행
-    )
-
-    print("")
 
     print("\n 모든 예시 완료")
