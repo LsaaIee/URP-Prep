@@ -90,40 +90,8 @@ with col2:
             step=0.1,
             help="AlphaFold2로 얻은 pLDDT 평균값"
         )
-    else:
+    else: # 선택사항. use_alphafold 시 링크 제공하여 사용자가 직접 pLDDT 값 도출해야 함. 
         manual_plddt = None
-
-    # fusion_type = st.selectbox(
-    #     "종류",
-    #     ["KWK", "SMAP-29", "Cys", "Custom"]
-    # )
-    
-    # if fusion_type == "Custom":
-    #     fusion_peptide = st.text_input("Fusion peptide 서열")
-    #     fusion_type_name = st.text_input("이름", "Custom")
-    # else:
-    #     fusion_peptide = st.text_input(
-    #         "Fusion peptide 서열",
-    #         help="전체 서열에서 fusion peptide 부분만 입력"
-    #     )
-    #     fusion_type_name = fusion_type
-    
-    # fusion_position = st.selectbox(
-    #     "위치",
-    #     ["C-terminal", "N-terminal", "Internal"]
-    # )
-    
-    # if not use_alphafold:
-    #     manual_plddt = st.number_input(
-    #         "평균 pLDDT (AlphaFold 결과)",
-    #         min_value=0.0,
-    #         max_value=100.0,
-    #         value=75.0,
-    #         step=0.1,
-    #         help="AlphaFold2로 얻은 pLDDT 평균값"
-    #     )
-    # else:
-    #     manual_plddt = None
 
 st.markdown("---")
 
@@ -143,8 +111,7 @@ if st.button("🚀 예측 시작", type="primary", use_container_width=True):
 
                 result = calculate_final_score(
                     sequence=full_sequence,
-                    fusion_peptides=fusion_peptides, # singular to plural
-                    # fusion_type=fusion_type_name,
+                    fusion_peptides=fusion_peptides,
                     manual_plddt=manual_plddt,
                     use_alphafold=use_alphafold,
                     weights=weights,
@@ -202,25 +169,7 @@ if st.button("🚀 예측 시작", type="primary", use_container_width=True):
                 st.write(f"**예상 효과:** {result['expected_cfu']}")
                 
                 # 상세 정보
-                with st.expander("📊 상세 분석 결과"):                    
-                    # Fusion peptide 특성
-                    # props = calculate_peptide_properties(fusion_peptide)
-                    # if props:
-                    #     st.subheader("Fusion Peptide 특성")
-                        
-                    #     prop_col1, prop_col2, prop_col3 = st.columns(3)
-                        
-                    #     with prop_col1:
-                    #         st.metric("순전하 (pH 7.4)", f"{props['charge']:+.2f}")
-                    #         st.metric("분자량", f"{props['molecular_weight']:.1f} Da")
-                        
-                    #     with prop_col2:
-                    #         st.metric("소수성 (GRAVY)", f"{props['gravy']:.3f}")
-                    #         st.metric("양전하 비율", f"{props['positive_ratio']:.1%}")
-                        
-                    #     with prop_col3:
-                    #         st.metric("소수성 AA 비율", f"{props['hydrophobic_ratio']:.1%}")
-                    
+                with st.expander("📊 상세 분석 결과"):
                     st.subheader("Fusion Peptide 특성")
 
                     if not fusion_peptides:
