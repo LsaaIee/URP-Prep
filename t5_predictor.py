@@ -216,6 +216,27 @@ def calculate_penetration_score(fusion_peptide, fusion_type):
     
     return penetration_score
 
+# below func added for multiple fusion peptides
+def calculate_penetration_score_for_list(fusion_peptides):
+    """
+    여러 fusion peptide의 투과 스코어를 합쳐서 하나의 값으로 반환.
+    fusion_peptides: [{"name": ..., "seq": ..., "position": ...}, ...]
+    """
+    if not fusion_peptides:
+        # fusion이 아예 없을 때: 외막 투과는 거의 안 된다고 가정 (튜닝 가능)
+        return 0.10
+
+    scores = []
+    for fp in fusion_peptides:
+        seq = fp["seq"]
+        name = fp.get("name", "Custom")
+        s = calculate_penetration_score(seq, name)
+        scores.append(s)
+
+    # 여러 개일 때의 집계 전략: 평균 (원하면 max로 바꿔도 됨)
+    return sum(scores) / len(scores)
+
+
 
 # ================== 3. 서열 적합성 스코어 (ESM-2) ==================
 
@@ -283,32 +304,38 @@ def calculate_sequence_score(sequence):
 
 def calculate_final_score(
         sequence, 
-        fusion_peptide, 
-        fusion_type, 
+        fusion_peptides=None, # 0 <= 개의 fusion peptide를 위한 수정
+        #fusion_type, 
         manual_plddt=None, 
         use_alphafold: bool = False, 
         weights=None,
     ) -> dict:
     """
     최종 0-1 스코어 계산 및 의사결정
-    
-    Parameters:
-    -----------
+
+    Parameters
+    ----------
     sequence : str
-        전체 T5 서열 (fusion peptide 포함)
-    fusion_peptide : str
-        Fusion peptide 서열만
-    fusion_type : str
-        'KWK', 'SMAP-29', 'Cys' 등
-    manual_plddt : float, optional
-        수동 입력 pLDDT (AlphaFold 실행 안 할 경우)
+        전체 T5 서열 (fusion 포함)
+    fusion_peptides : list[dict] | None
+        예시:
+        [
+          {"name": "KWK", "seq": "KWKKWK", "position": "internal"},
+          {"name": "Cys", "seq": "C",      "position": "C-terminal"},
+        ]
+        - None 또는 [] 이면 fusion 없는 native T5로 처리
+    manual_plddt : float | None
     use_alphafold : bool
-        True면 AlphaFold2 로컬 실행
+    weights : dict | None
+        {"structure": 0.3, "penetration": 0.4, "sequence": 0.3}
     """
     
     print("\n" + "="*60)
     print("T5 Endolysin Activity Prediction")
     print("="*60 + "\n")
+    
+    if fusion_peptides is None:
+        fusion_peptides = []
     
     results = {}
     
@@ -330,15 +357,25 @@ def calculate_final_score(
     
     # 2. 외막 투과 예측 스코어
     print("🧬 2단계: 외막 투과 능력 분석")
-    penetration_score = calculate_penetration_score(fusion_peptide, fusion_type)
+    penetration_score = calculate_penetration_score_for_list(fusion_peptides)
     results['penetration_score'] = penetration_score
-    
-    props = calculate_peptide_properties(fusion_peptide)
-    if props:
-        print(f"   순전하: {props['charge']:+.2f}")
-        print(f"   소수성 (GRAVY): {props['gravy']:.3f}")
-        print(f"   양전하 비율: {props['positive_ratio']:.1%}")
+    print(f"   Fusion 개수: {len(fusion_peptides)}")
     print(f"   투과 스코어: {penetration_score:.3f}\n")
+
+    # if fusion_peptides:
+    #     fp0 = fusion_peptides[0]
+    #     props0 = calculate_peptide_properties(fp0["seq"])
+    #     if props0:
+    #         print(f"   [Fusion #1: {fp0['name']} @ {fp0['position']}]")
+    #         print(f"     순전하: {props0['charge']:+.2f}")
+    #         print(f"     소수성 (GRAVY): {props0['gravy']:.3f}")
+            
+    # props = calculate_peptide_properties(fusion_peptide)
+    # if props:
+    #     print(f"   순전하: {props['charge']:+.2f}")
+    #     print(f"   소수성 (GRAVY): {props['gravy']:.3f}")
+    #     print(f"   양전하 비율: {props['positive_ratio']:.1%}")
+    # print(f"   투과 스코어: {penetration_score:.3f}\n")
     
     # 3. 서열 적합성 스코어
     print("🤖 3단계: AI 서열 적합성 분석")
@@ -466,23 +503,46 @@ def batch_prediction(csv_file, output_file="predictions.csv"):
 
 if __name__ == "__main__":
     print("\n" + "="*60)
-    print("T5 Endolysin Activity Predictor v1.0")
+    print("T5 Endolysin Activity Predictor v2.0")
     print("="*60)
     
     # 사용 예시 1: 단일 서열 예측
-    print("\n[예시 1] T5-SMAP29 서열 분석\n")
+    print("\n[예시 1] T5 서열 분석\n")
     
     # 실제 서열로 교체하세요
-    example_sequence = "SFKFGKNSEKQLATVKPELQKVARRALELSPYDFTIVQGIRTVAQSAQNIANGTSFLKDPSKSKHITGDAIDFAPYINGKIDWNDLEAFWAVKKAFEQAGKELGIKLRFGADWNASSGIIMMKLNVAPMMVVVELV"
-    fusion_peptide = "KWKLFKKI"  # SMAP-29
-    
-    result = calculate_final_score(
-        sequence=example_sequence + fusion_peptide,
-        fusion_peptide=fusion_peptide,
-        fusion_type="KWK",
-        manual_plddt=82.5,  # AlphaFold로 얻은 값 또는 추정값
+    t5_sequence = "SFKFGKNSEKQLATVKPELQKVARRALELSPYDFTIVQGIRTVAQSAQNIANGTSFLKDPSKSKHITGDAIDFAPYINGKIDWNDLEAFWAVKKAFEQAGKELGIKLRFGADWNASSGIIMMKLNVAPMMVVVELV"
+    result_t5 = calculate_final_score(
+        sequence=t5_sequence,
+        fusion_peptides=[],
+        manual_plddt=84.06,
+        use_alphafold=False
+    )
+
+    # 사용 예시 2: T5 + KWK
+    print("\n[예시 2] T5 + KWK\n")
+    fusion_peptides = [
+        {"name": "KWK", "seq": "KWKLFKKI", "position": "internal"}
+    ]
+    ## from here, add kwk, cys, kwk+cys
+
+    result_kwk = calculate_final_score(
+        sequence=kwk_sequence
+        fusion_peptides=fusion_peptides,
+        manual_plddt=74.2,  # AlphaFold로 얻은 값 또는 추정값
         use_alphafold=False  # True로 설정하면 AlphaFold 자동 실행
     )
     
-    # 사용 예시 2: 배치 예측 (주석 해제하여 사용)
-    # batch_prediction("sequences.csv", "predictions.csv")
+    print("\n[예시 3] T5 + cys\n")
+    fusion_peptides = [
+        {"name": "cys", "seq": "GGGGSC", "position": "C-terminal"}
+    ]
+    result = calculate_final_score(
+        sequence=example_sequence + "GGGGSC",
+        fusion_peptides=fusion_peptides,
+        manual_plddt=70.4,  # AlphaFold로 얻은 값 또는 추정값
+        use_alphafold=False  # True로 설정하면 AlphaFold 자동 실행
+    )
+
+    print("")
+
+    print("\n 모든 예시 완료")
