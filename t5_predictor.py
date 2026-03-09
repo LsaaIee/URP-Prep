@@ -97,7 +97,7 @@ def calculate_structure_score(plddt):
 
 # ================== 2. 외막 투과 예측 스코어 ==================
 
-def calculate_peptide_properties(sequence):
+def calculate_peptide_properties(sequence): # &
     """
     Biopython으로 펩타이드 물리화학적 특성 계산
     """

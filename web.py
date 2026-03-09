@@ -15,8 +15,8 @@ with st.sidebar:
     
     st.markdown("### 가중치 조정")
     w_structure = st.slider("구조 안정성", 0.0, 1.0, 0.30, 0.05)
-    w_penetration = st.slider("외막 투과성", 0.0, 1.0, 0.40, 0.05)
-    w_sequence = st.slider("서열 적합성", 0.0, 1.0, 0.30, 0.05)
+    w_penetration = st.slider("외막 투과성", 0.0, 1.0, 0.55, 0.05)
+    w_sequence = st.slider("서열 적합성", 0.0, 1.0, 0.15, 0.05)
     
     total_weight = w_structure + w_penetration + w_sequence
     if abs(total_weight - 1.0) > 0.01:
@@ -35,7 +35,7 @@ with col1:
         help="FASTA 형식 또는 순수 아미노산 서열"
     )
     
-    # FASTA 형식 처리
+    # FASTA 형식 입력 처리 &
     if full_sequence.startswith(">"):
         lines = full_sequence.split("\n")
         full_sequence = "".join([line for line in lines if not line.startswith(">")])
