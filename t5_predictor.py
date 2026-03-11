@@ -415,7 +415,7 @@ def calculate_final_score(
     
     # 5. 의사결정
     print("💡 권장사항")
-    if final_score >= 0.75:
+    if final_score >= 0.85:
         decision = "✅ PROCEED TO LNP"
         explanation = "높은 활성이 예측됩니다. 즉시 LNP 단계로 진행하세요."
         expected_cfu = "≥99% CFU reduction (2-log)"
