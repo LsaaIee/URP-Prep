@@ -1,0 +1,9 @@
+streamlit>=1.28.0
+biopython>=1.83
+pandas>=2.0
+numpy>=1.24
+torch>=2.0
+transformers>=4.35
+plotly>=5.17
+scipy>=1.11
+fair-esm>=1.5.5
