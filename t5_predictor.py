@@ -89,9 +89,7 @@ def calculate_structure_score(plddt):
     """
     pLDDT 값을 0-1 스코어로 변환
     """
-    # pLDDT 50 이하는 매우 불안정
-    # pLDDT 90 이상은 매우 안정적
-    score = max(0, min(1, (plddt - 50) / 40))
+    score = max(0, min(1, (plddt - 20) / 70))
     return score
 
 
@@ -195,26 +193,39 @@ def calculate_penetration_score(fusion_peptide, fusion_type):
     else:
         hydro_score = max(0, 1.0 - (hydro_ratio - 0.4) / 0.3)
     
-    # Fusion type별 가중치 조정
-    if fusion_type in ['KWK', 'kwk']:
-        # KWK는 양전하가 중요
-        weights = [0.5, 0.2, 0.3]
-    elif fusion_type in ['SMAP-29', 'SMAP29', 'smap']:
-        # SMAP-29는 양친매성이 중요
-        weights = [0.3, 0.5, 0.2]
-    elif fusion_type in ['Cys', 'cys', 'CYS']:
-        # Cys는 구조적 안정성에 더 의존
-        weights = [0.3, 0.3, 0.4]
+    # [핵심 개선 1] 순전하(Net Charge) 기반 하이패스 적용 (Art-175 구제)
+    if props['charge'] >= 5.0:
+        base_pen = 1.0 
     else:
-        weights = [0.4, 0.3, 0.3]
+        base_pen = 0.4 * charge_score + 0.3 * amphi_score + 0.3 * hydro_score
+        
+    # [핵심 개선 2] 분자량 기반 입체장애 페널티 부여 (EC34 거품 제거)
+    mw = props['molecular_weight']
+    if mw > 2500:
+        base_pen *= 0.2 
+        
+    return base_pen
+
+    # # Fusion type별 가중치 조정
+    # if fusion_type in ['KWK', 'kwk']:
+    #     # KWK는 양전하가 중요
+    #     weights = [0.5, 0.2, 0.3]
+    # elif fusion_type in ['SMAP-29', 'SMAP29', 'smap']:
+    #     # SMAP-29는 양친매성이 중요
+    #     weights = [0.3, 0.5, 0.2]
+    # elif fusion_type in ['Cys', 'cys', 'CYS']:
+    #     # Cys는 구조적 안정성에 더 의존
+    #     weights = [0.3, 0.3, 0.4]
+    # else:
+    #     weights = [0.4, 0.3, 0.3]
     
-    penetration_score = (
-        weights[0] * charge_score +
-        weights[1] * amphi_score +
-        weights[2] * hydro_score
-    )
+    # penetration_score = (
+    #     weights[0] * charge_score +
+    #     weights[1] * amphi_score +
+    #     weights[2] * hydro_score
+    # )
     
-    return penetration_score
+    # return penetration_score
 
 # below func added for multiple fusion peptides
 def calculate_penetration_score_for_list(fusion_peptides):
